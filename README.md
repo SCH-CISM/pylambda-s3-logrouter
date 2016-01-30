@@ -1,27 +1,34 @@
-# pylambda-login-alerter
-A python function for AWS Lambda to receive CloudWatch Logs streams and alert 
-via SNS when a succesfull SSH login is detected.
+# pylambda-s3-logrouter
+A python function for AWS Lambda to route incoming log bundles to the various consuming processes
 
 ## Background
 
-Direct SSH logins to instances is highly discouraged. To monitor SSH use in near real time, CloudWatch Logs 
-receives key system logs from all instances. Creating a subscription from this Lambda function to your 
-CloudWatch log streamwill send a SNS message for every succesfull SSH login. From SNS, these alerts can 
-be forwarded to Slack, PagerDuty, Email, etc.
-
-Sample filter for `/var/log/secure`: `[month, day, time, host, daemon=sshd*, accepted=Accepted,  ...]`
+Several processes consume log files received from on-premises systems via batched upload. This Lambda 
+function receives S3 events from the upload location, extracts tar files into the component parts, 
+and uploads them to the various processes input locations on S3. Upon completion, a message of results are 
+sent to a SNS topic.
 
 Current output message format includes:
-- Source IP of the login
-- Timestamp (from the host log)
-- User ID logging in
-- Hostname upon which the login is detected (from the host log)
-- `project` tag of the host (defaults to `unknown` if not present)
+- Source file
+- Destination bucket and prefix
+- Number of files copied
 
 ## IAM Permissions Required
 
-- sns-publish
-- ec2 describe-tags
+- sns::publish
+- s3::get-object
+- s3::put-object
+- s3::put-object-acl
+
+## Configuration
+
+A config.yml file has three sections of parameters
+- ELK (bucket and prefix)
+- EMR (bucket and prefix)
+- SNS Topic ARN
+
+Current testing shows a Lambda function with 1,024MB of memory and an execution 
+timeout of 5 minutes is required for successful completion.
 
 # References and Credits
 
