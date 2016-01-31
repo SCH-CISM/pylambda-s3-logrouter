@@ -1,36 +1,55 @@
 # pylambda-s3-logrouter
-A python function for AWS Lambda to route incoming log bundles to the various consuming processes
+
+A python function for AWS Lambda to route incoming log bundles to the various
+consuming processes.
 
 ## Background
 
-Several processes consume log files received from on-premises systems via batched upload. This Lambda 
-function receives S3 events from the upload location, extracts tar files into the component parts, 
-and uploads them to the various processes input locations on S3. Upon completion, a message of results are 
-sent to a SNS topic.
+Several processes consume log files received from on-premises systems via
+batched upload. This Lambda function receives S3 events from the upload
+location, extracts tar files into the component parts, and uploads them with
+SSE to a configured destination location in S3. Upon completion, a message of
+results are sent to a SNS topic.
 
-Current output message format includes:
+This Lambda function can receive S3 events either via SNS or directly from S3.
+
+Output message format includes:
 - Source file
 - Destination bucket and prefix
-- Number of files copied
+- Number of files copied to destination
+- Bytes copied to destination (not currently working)
 
-## IAM Permissions Required
+## Required IAM Permissions
 
-- sns::publish
+This lambda function must have the following permissions:
 - s3::get-object
 - s3::put-object
-- s3::put-object-acl
+- sns::publish
 
 ## Configuration
 
-A config.yml file has three sections of parameters
-- ELK (bucket and prefix)
-- EMR (bucket and prefix)
-- SNS Topic ARN
+A config.yml file has two sections of parameters
 
-Current testing shows a Lambda function with 1,024MB of memory and an execution 
+| Section | Parameter | Value                                     |
+|---------|-----------|-------------------------------------------|
+| dst     | bucket    | destination bucket                        |
+| dst     | prefix    | key prefix to place files                 |
+| sns     | topic     | SNS topic ARN to send completion messages |
+
+Current testing shows a Lambda function with 768MB of memory and an execution
 timeout of 5 minutes is required for successful completion.
 
-# References and Credits
+## Compiling
 
-This is loosely based upon the very useful patterns demonstrated at 
-https://github.com/elelsee/pycfn-custom-resource and https://github.com/elelsee/pycfn-elasticsearch.
+The `build_lambda_function.sh` script creates a ZIP file for deploying to 
+AWS Lambda. The `config.yml` file is bundled with the function and must be 
+configured prior to building.
+
+## References and Credits
+
+Parallel tar extract concept adapted from 
+https://github.com/Kixeye/untar-to-s3/blob/master/untar-to-s3.py.
+
+General Lambda principals loosed based upon the very useful patterns 
+demonstrated at https://github.com/elelsee/pycfn-custom-resource and 
+https://github.com/elelsee/pycfn-elasticsearch.
