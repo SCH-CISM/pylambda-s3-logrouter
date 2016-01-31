@@ -21,9 +21,8 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 logging.captureWarnings(True)
 
-# Disable boto's debug logging. It's not helpful.
-# logger1 = logging.getLogger('boto3')
-# logger1.setLevel(logging.WARN)
+# Disable boto's default info logging. It's too voluminous.
+logging.getLogger('boto3').setLevel(logging.WARN)
 
 # fetch config settings
 with open('config.yml', 'r') as f:
@@ -37,7 +36,7 @@ def __deploy_asset_to_s3(data, size, bucket, key):
     try:
         logging.debug("Uploading %s (%s bytes)" % (key, size))
         client.put_object(Body=data, Bucket=bucket, Key=key,
-                          ContentLength=size, ACL='public-read',
+                          ContentLength=size, 
                           ServerSideEncryption='AES256')
 
     except Exception as e:
@@ -106,6 +105,7 @@ def uncompress_and_copy(src_bucket, src_key, dst_bucket, dst_keyprefix='',
     except tarfile.ReadError:
         print("Unable to read asset tarfile", file=sys.stderr)
         return
+
     return {'source': os.path.join(src_bucket, src_key),
             'destination': os.path.join(dst_bucket, dst_keyprefix),
             'files_sent': files_uploaded,
@@ -133,6 +133,7 @@ def delete_key(bucket, key):
 def notify_status(topic, subject, message):
     """Send status message to SNS topic."""
     client = boto3.client('sns')
+    message = json.dumps(message)
     client.publish(TopicArn=topic, Message=message, Subject=subject)
     return
 
@@ -148,6 +149,10 @@ def lambda_handler(event, context):
         context_json.pop('identity')
     log.info("Context: {}".format(json.dumps(context_json)))
 
+    # when receiving message via SNS, the S3 message must be extracted
+    if 'Sns' in event['Records'][0]:
+        event = json.loads(event['Records'][0]['Sns']['Message'])
+
     src_bucket = event['Records'][0]['s3']['bucket']['name']
     log.info("Source bucket: {}".format(src_bucket))
     src_key = event['Records'][0]['s3']['object']['key']
@@ -156,14 +161,8 @@ def lambda_handler(event, context):
     message = {'Results': []}
 
     result = uncompress_and_copy(src_bucket, src_key,
-                                 config['elk']['bucket'],
-                                 config['elk']['keyprefix'],
-                                 strip_components=1,
-                                 concurrency=100)
-    message['Results'].append(result)
-    result = uncompress_and_copy(src_bucket, src_key,
-                                 config['emr']['bucket'],
-                                 config['emr']['keyprefix'],
+                                 config['dst']['bucket'],
+                                 config['dst']['keyprefix'],
                                  strip_components=1,
                                  concurrency=100)
     message['Results'].append(result)
