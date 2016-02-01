@@ -30,11 +30,12 @@ This lambda function must have the following permissions:
 
 A config.yml file has two sections of parameters
 
-| Section | Parameter | Value                                     |
-|---------|-----------|-------------------------------------------|
-| dst     | bucket    | destination bucket                        |
-| dst     | prefix    | key prefix to place files                 |
-| sns     | topic     | SNS topic ARN to send completion messages |
+| Section | Parameter        | Value                                         |
+|---------|------------------|-----------------------------------------------|
+| dst     | bucket           | destination bucket                            |
+| dst     | prefix           | key prefix to place files                     |
+| dst     | extract_dates    | boolean flag to extract subkey name from date |
+| sns     | topic            | SNS topic ARN to send completion messages     |
 
 Current testing shows a Lambda function with 768MB of memory and an execution
 timeout of 5 minutes is required for successful completion.

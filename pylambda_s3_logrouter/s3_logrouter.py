@@ -13,6 +13,7 @@ import boto3
 import json
 import sys
 import yaml
+import re
 import os
 import tarfile
 
@@ -36,7 +37,7 @@ def __deploy_asset_to_s3(data, size, bucket, key):
     try:
         logging.debug("Uploading %s (%s bytes)" % (key, size))
         client.put_object(Body=data, Bucket=bucket, Key=key,
-                          ContentLength=size, 
+                          ContentLength=size,
                           ServerSideEncryption='AES256')
 
     except Exception as e:
@@ -49,7 +50,8 @@ def __deploy_asset_to_s3(data, size, bucket, key):
 
 
 def uncompress_and_copy(src_bucket, src_key, dst_bucket, dst_keyprefix='',
-                        concurrency=50, strip_components=0):
+                        concurrency=50, strip_components=0,
+                        extract_dates=False):
     """Upload the contents of a tarball to the S3 bucket."""
 
     client = boto3.client('s3')
@@ -78,7 +80,19 @@ def uncompress_and_copy(src_bucket, src_key, dst_bucket, dst_keyprefix='',
                     if not bool(stripped_name):
                         continue
 
-                    path = os.path.join(dst_keyprefix, '/'.join(stripped_name))
+                    # add the date from the filename, if requested
+                    if extract_dates:
+                        m = re.search(r"\-(\d{4})(\d{2})(\d{2}).tar", src_key)
+                        if m:
+                            date_key = '-'.join([m.group(1), m.group(2), m.group(3)])
+                            keyprefix = os.path.join(dst_keyprefix, date_key)
+                        else:
+                            log.warn("Extract_dates requested, but no date found")
+                            keyprefix = dst_keyprefix
+                    else:
+                        keyprefix = dst_keyprefix
+
+                    path = os.path.join(keyprefix, '/'.join(stripped_name))
 
                     # Read file data from the tarball
                     fd = tarball.extractfile(member)
@@ -107,7 +121,7 @@ def uncompress_and_copy(src_bucket, src_key, dst_bucket, dst_keyprefix='',
         return
 
     return {'source': os.path.join(src_bucket, src_key),
-            'destination': os.path.join(dst_bucket, dst_keyprefix),
+            'destination': os.path.join(dst_bucket, keyprefix),
             'files_sent': files_uploaded,
             'bytes_sent': 0}
 
@@ -160,11 +174,15 @@ def lambda_handler(event, context):
 
     message = {'Results': []}
 
+    if 'extract_dates' not in config['dst']:
+        config['dst']['extract_dates'] = False
+
     result = uncompress_and_copy(src_bucket, src_key,
                                  config['dst']['bucket'],
                                  config['dst']['keyprefix'],
                                  strip_components=1,
-                                 concurrency=100)
+                                 concurrency=100,
+                                 extract_dates=config['dst']['extract_dates'])
     message['Results'].append(result)
     notify_status(config['sns']['topic'], message=message, subject='LogRouter')
 
