@@ -1,0 +1,9 @@
+dst:
+  bucket: my-super-cool-bucket
+  keyprefix: filesprefix
+  extract_dates: true
+#dst:
+#  bucket: loginbox-cism-sch
+#  keyprefix: 2-ELK/input
+sns:
+  topic: arn:aws:sns:REGION:ACCT_ID:TOPIC_NAME
